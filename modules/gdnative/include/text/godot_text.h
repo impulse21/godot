@@ -79,6 +79,10 @@ typedef struct {
 	float (*font_get_descent)(void *, godot_rid *, int);
 	float (*font_get_underline_position)(void *, godot_rid *, int);
 	float (*font_get_underline_thickness)(void *, godot_rid *, int);
+	int (*font_get_spacing_space)(void *, godot_rid *);
+	void (*font_set_spacing_space)(void *, godot_rid *, int);
+	int (*font_get_spacing_glyph)(void *, godot_rid *);
+	void (*font_set_spacing_glyph)(void *, godot_rid *, int);
 	void (*font_set_antialiased)(void *, godot_rid *, bool);
 	bool (*font_get_antialiased)(void *, godot_rid *);
 	godot_dictionary (*font_get_feature_list)(void *, godot_rid *);
@@ -175,8 +179,8 @@ void GDAPI godot_glyph_set_flags(godot_glyph *p_self, godot_int p_flags);
 godot_vector2 GDAPI godot_glyph_get_offset(const godot_glyph *p_self);
 void GDAPI godot_glyph_set_offset(godot_glyph *p_self, const godot_vector2 *p_offset);
 
-godot_real GDAPI godot_glyph_get_advance(const godot_glyph *p_self);
-void GDAPI godot_glyph_set_advance(godot_glyph *p_self, godot_real p_advance);
+godot_float GDAPI godot_glyph_get_advance(const godot_glyph *p_self);
+void GDAPI godot_glyph_set_advance(godot_glyph *p_self, godot_float p_advance);
 
 godot_rid GDAPI godot_glyph_get_font(const godot_glyph *p_self);
 void GDAPI godot_glyph_set_font(godot_glyph *p_self, godot_rid *p_font);

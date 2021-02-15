@@ -268,7 +268,6 @@ void SpinBox::_bind_methods() {
 }
 
 SpinBox::SpinBox() {
-	last_w = 0;
 	line_edit = memnew(LineEdit);
 	add_child(line_edit);
 
@@ -280,7 +279,6 @@ SpinBox::SpinBox() {
 	line_edit->connect("text_entered", callable_mp(this, &SpinBox::_text_entered), Vector<Variant>(), CONNECT_DEFERRED);
 	line_edit->connect("focus_exited", callable_mp(this, &SpinBox::_line_edit_focus_exit), Vector<Variant>(), CONNECT_DEFERRED);
 	line_edit->connect("gui_input", callable_mp(this, &SpinBox::_line_edit_input));
-	drag.enabled = false;
 
 	range_click_timer = memnew(Timer);
 	range_click_timer->connect("timeout", callable_mp(this, &SpinBox::_range_click_timeout));

@@ -138,6 +138,26 @@ float TextServerGDNative::font_get_underline_thickness(RID p_font, int p_size) c
 	return interface->font_get_underline_thickness(data, (godot_rid *)&p_font, p_size);
 }
 
+int TextServerGDNative::font_get_spacing_space(RID p_font) const {
+	ERR_FAIL_COND_V(interface == nullptr, 0);
+	return interface->font_get_spacing_space(data, (godot_rid *)&p_font);
+}
+
+void TextServerGDNative::font_set_spacing_space(RID p_font, int p_value) {
+	ERR_FAIL_COND(interface == nullptr);
+	interface->font_set_spacing_space(data, (godot_rid *)&p_font, p_value);
+}
+
+int TextServerGDNative::font_get_spacing_glyph(RID p_font) const {
+	ERR_FAIL_COND_V(interface == nullptr, 0);
+	return interface->font_get_spacing_glyph(data, (godot_rid *)&p_font);
+}
+
+void TextServerGDNative::font_set_spacing_glyph(RID p_font, int p_value) {
+	ERR_FAIL_COND(interface == nullptr);
+	interface->font_set_spacing_glyph(data, (godot_rid *)&p_font, p_value);
+}
+
 void TextServerGDNative::font_set_antialiased(RID p_font, bool p_antialiased) {
 	ERR_FAIL_COND(interface == nullptr);
 	interface->font_set_antialiased(data, (godot_rid *)&p_font, p_antialiased);
@@ -703,12 +723,12 @@ void GDAPI godot_glyph_set_offset(godot_glyph *p_self, const godot_vector2 *p_of
 	self->y_off = offset->y;
 }
 
-godot_real GDAPI godot_glyph_get_advance(const godot_glyph *p_self) {
+godot_float GDAPI godot_glyph_get_advance(const godot_glyph *p_self) {
 	const TextServer::Glyph *self = (const TextServer::Glyph *)p_self;
 	return self->advance;
 }
 
-void GDAPI godot_glyph_set_advance(godot_glyph *p_self, godot_real p_advance) {
+void GDAPI godot_glyph_set_advance(godot_glyph *p_self, godot_float p_advance) {
 	TextServer::Glyph *self = (TextServer::Glyph *)p_self;
 	self->advance = p_advance;
 }

@@ -61,7 +61,7 @@ protected:
 	}
 
 	void _sig_changed() {
-		_change_notify();
+		notify_property_list_changed();
 		emit_signal("changed");
 	}
 
@@ -172,7 +172,7 @@ protected:
 public:
 	void edit(const StringName &p_sig) {
 		sig = p_sig;
-		_change_notify();
+		notify_property_list_changed();
 	}
 
 	VisualScriptEditorSignalEdit() { undo_redo = nullptr; }
@@ -195,11 +195,10 @@ protected:
 	}
 
 	void _var_changed() {
-		_change_notify();
+		notify_property_list_changed();
 		emit_signal("changed");
 	}
 	void _var_value_changed() {
-		_change_notify("value"); // So the whole tree is not redrawn, makes editing smoother in general.
 		emit_signal("changed");
 	}
 
@@ -331,7 +330,7 @@ protected:
 public:
 	void edit(const StringName &p_var) {
 		var = p_var;
-		_change_notify();
+		notify_property_list_changed();
 	}
 
 	VisualScriptEditorVariableEdit() { undo_redo = nullptr; }
@@ -981,6 +980,10 @@ void VisualScriptEditor::_update_graph(int p_only_id) {
 	}
 
 	_update_graph_connections();
+
+	float graph_minimap_opacity = EditorSettings::get_singleton()->get("editors/visual_editors/minimap_opacity");
+	graph->set_minimap_opacity(graph_minimap_opacity);
+
 	// Use default_func instead of default_func for now I think that should be good stop gap solution to ensure not breaking anything.
 	graph->call_deferred("set_scroll_ofs", script->get_scroll() * EDSCALE);
 	updating_graph = false;
@@ -3685,16 +3688,23 @@ void VisualScriptEditor::_comment_node_resized(const Vector2 &p_new_size, int p_
 		return;
 	}
 
+	Vector2 new_size = p_new_size;
+	if (graph->is_using_snap()) {
+		Vector2 snap = Vector2(graph->get_snap(), graph->get_snap());
+		Vector2 min_size = (gn->get_minimum_size() + (snap * 0.5)).snapped(snap);
+		new_size = new_size.snapped(snap).max(min_size);
+	}
+
 	updating_graph = true;
 
 	graph->set_block_minimum_size_adjust(true); //faster resize
 
 	undo_redo->create_action(TTR("Resize Comment"), UndoRedo::MERGE_ENDS);
-	undo_redo->add_do_method(vsc.ptr(), "set_size", p_new_size / EDSCALE);
+	undo_redo->add_do_method(vsc.ptr(), "set_size", new_size / EDSCALE);
 	undo_redo->add_undo_method(vsc.ptr(), "set_size", vsc->get_size());
 	undo_redo->commit_action();
 
-	gn->set_custom_minimum_size(p_new_size);
+	gn->set_custom_minimum_size(new_size);
 	gn->set_size(Size2(1, 1));
 	graph->set_block_minimum_size_adjust(false);
 	updating_graph = false;
@@ -4326,6 +4336,8 @@ VisualScriptEditor::VisualScriptEditor() {
 	graph->connect("duplicate_nodes_request", callable_mp(this, &VisualScriptEditor::_on_nodes_duplicate));
 	graph->connect("gui_input", callable_mp(this, &VisualScriptEditor::_graph_gui_input));
 	graph->set_drag_forwarding(this);
+	float graph_minimap_opacity = EditorSettings::get_singleton()->get("editors/visual_editors/minimap_opacity");
+	graph->set_minimap_opacity(graph_minimap_opacity);
 	graph->hide();
 	graph->connect("scroll_offset_changed", callable_mp(this, &VisualScriptEditor::_graph_ofs_changed));
 

@@ -601,6 +601,34 @@ float TextServerAdvanced::font_get_underline_thickness(RID p_font, int p_size) c
 	return fd->get_underline_thickness(p_size);
 }
 
+int TextServerAdvanced::font_get_spacing_space(RID p_font) const {
+	_THREAD_SAFE_METHOD_
+	const FontDataAdvanced *fd = font_owner.getornull(p_font);
+	ERR_FAIL_COND_V(!fd, 0);
+	return fd->get_spacing_space();
+}
+
+void TextServerAdvanced::font_set_spacing_space(RID p_font, int p_value) {
+	_THREAD_SAFE_METHOD_
+	FontDataAdvanced *fd = font_owner.getornull(p_font);
+	ERR_FAIL_COND(!fd);
+	fd->set_spacing_space(p_value);
+}
+
+int TextServerAdvanced::font_get_spacing_glyph(RID p_font) const {
+	_THREAD_SAFE_METHOD_
+	const FontDataAdvanced *fd = font_owner.getornull(p_font);
+	ERR_FAIL_COND_V(!fd, 0);
+	return fd->get_spacing_glyph();
+}
+
+void TextServerAdvanced::font_set_spacing_glyph(RID p_font, int p_value) {
+	_THREAD_SAFE_METHOD_
+	FontDataAdvanced *fd = font_owner.getornull(p_font);
+	ERR_FAIL_COND(!fd);
+	fd->set_spacing_glyph(p_value);
+}
+
 void TextServerAdvanced::font_set_antialiased(RID p_font, bool p_antialiased) {
 	_THREAD_SAFE_METHOD_
 	FontDataAdvanced *fd = font_owner.getornull(p_font);
@@ -1602,11 +1630,18 @@ bool TextServerAdvanced::shaped_text_update_breaks(RID p_shaped) {
 
 	HashMap<int, bool> breaks;
 	UErrorCode err = U_ZERO_ERROR;
-	for (int i = 0; i < sd->spans.size(); i++) {
-		UBreakIterator *bi = ubrk_open(UBRK_LINE, sd->spans[i].language.ascii().get_data(), data + _convert_pos_inv(sd, sd->spans[i].start), _convert_pos_inv(sd, sd->spans[i].end - sd->spans[i].start), &err);
+	int i = 0;
+	while (i < sd->spans.size()) {
+		String language = sd->spans[i].language;
+		int r_start = sd->spans[i].start;
+		while (i + 1 < sd->spans.size() && language == sd->spans[i + 1].language) {
+			i++;
+		}
+		int r_end = sd->spans[i].end;
+		UBreakIterator *bi = ubrk_open(UBRK_LINE, language.ascii().get_data(), data + _convert_pos_inv(sd, r_start), _convert_pos_inv(sd, r_end - r_start), &err);
 		if (U_FAILURE(err)) {
 			//No data loaded - use fallback.
-			for (int j = sd->spans[i].start; j < sd->spans[i].end; j++) {
+			for (int j = r_start; j < r_end; j++) {
 				char32_t c = sd->text[j - sd->start];
 				if (is_whitespace(c)) {
 					breaks[j] = false;
@@ -1617,8 +1652,8 @@ bool TextServerAdvanced::shaped_text_update_breaks(RID p_shaped) {
 			}
 		} else {
 			while (ubrk_next(bi) != UBRK_DONE) {
-				int pos = _convert_pos(sd, ubrk_current(bi)) + sd->spans[i].start - 1;
-				if (pos != sd->spans[i].end) {
+				int pos = _convert_pos(sd, ubrk_current(bi)) + r_start - 1;
+				if (pos != r_end) {
 					if ((ubrk_getRuleStatus(bi) >= UBRK_LINE_HARD) && (ubrk_getRuleStatus(bi) < UBRK_LINE_HARD_LIMIT)) {
 						breaks[pos] = true;
 					} else if ((ubrk_getRuleStatus(bi) >= UBRK_LINE_SOFT) && (ubrk_getRuleStatus(bi) < UBRK_LINE_SOFT_LIMIT)) {
@@ -1628,6 +1663,7 @@ bool TextServerAdvanced::shaped_text_update_breaks(RID p_shaped) {
 			}
 		}
 		ubrk_close(bi);
+		i++;
 	}
 
 	sd->sort_valid = false;
@@ -1636,7 +1672,7 @@ bool TextServerAdvanced::shaped_text_update_breaks(RID p_shaped) {
 	const char32_t *ch = sd->text.ptr();
 	Glyph *sd_glyphs = sd->glyphs.ptrw();
 
-	for (int i = 0; i < sd_size; i++) {
+	for (i = 0; i < sd_size; i++) {
 		if (sd_glyphs[i].count > 0) {
 			char32_t c = ch[sd_glyphs[i].start - sd->start];
 			if (c == 0xfffc) {
@@ -2040,6 +2076,11 @@ void TextServerAdvanced::_shape_run(ShapedTextDataAdvanced *p_sd, int32_t p_star
 				}
 				gl.x_off = Math::round(glyph_pos[i].x_offset / (64.0 / fd->get_font_scale(fs)));
 				gl.y_off = -Math::round(glyph_pos[i].y_offset / (64.0 / fd->get_font_scale(fs)));
+			}
+			if (fd->get_spacing_space() && is_whitespace(p_sd->text[glyph_info[i].cluster])) {
+				gl.advance += fd->get_spacing_space();
+			} else {
+				gl.advance += fd->get_spacing_glyph();
 			}
 
 			if (p_sd->preserve_control) {

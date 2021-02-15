@@ -214,7 +214,7 @@ void ScriptTextEditor::_load_theme_settings() {
 	text_edit->add_theme_color_override("line_number_color", line_number_color);
 	text_edit->add_theme_color_override("caret_color", caret_color);
 	text_edit->add_theme_color_override("caret_background_color", caret_background_color);
-	text_edit->add_theme_color_override("font_color_selected", text_selected_color);
+	text_edit->add_theme_color_override("font_selected_color", text_selected_color);
 	text_edit->add_theme_color_override("selection_color", selection_color);
 	text_edit->add_theme_color_override("brace_mismatch_color", brace_mismatch_color);
 	text_edit->add_theme_color_override("current_line_color", current_line_color);
@@ -688,7 +688,7 @@ void ScriptEditor::_update_modified_scripts_for_external_editor(Ref<Script> p_fo
 		uint64_t date = FileAccess::get_modified_time(script->get_path());
 
 		if (last_date != date) {
-			Ref<Script> rel_script = ResourceLoader::load(script->get_path(), script->get_class(), true);
+			Ref<Script> rel_script = ResourceLoader::load(script->get_path(), script->get_class(), ResourceFormatLoader::CACHE_MODE_IGNORE);
 			ERR_CONTINUE(!rel_script.is_valid());
 			script->set_source_code(rel_script->get_source_code());
 			script->set_last_modified_time(rel_script->get_last_modified_time());
