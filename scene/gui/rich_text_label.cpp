@@ -45,7 +45,7 @@
 #include "editor/editor_scale.h"
 #endif
 
-RichTextLabel::Item *RichTextLabel::_get_next_item(Item *p_item, bool p_free) {
+RichTextLabel::Item *RichTextLabel::_get_next_item(Item *p_item, bool p_free) const {
 	if (p_free) {
 		if (p_item->subitems.size()) {
 			return p_item->subitems.front()->get();
@@ -90,7 +90,7 @@ RichTextLabel::Item *RichTextLabel::_get_next_item(Item *p_item, bool p_free) {
 	return nullptr;
 }
 
-RichTextLabel::Item *RichTextLabel::_get_prev_item(Item *p_item, bool p_free) {
+RichTextLabel::Item *RichTextLabel::_get_prev_item(Item *p_item, bool p_free) const {
 	if (p_free) {
 		if (p_item->subitems.size()) {
 			return p_item->subitems.back()->get();
@@ -147,7 +147,7 @@ RichTextLabel::Item *RichTextLabel::_get_item_at_pos(RichTextLabel::Item *p_item
 			case ITEM_TEXT: {
 				ItemText *t = (ItemText *)it;
 				offset += t->text.length();
-				if (offset > p_position) {
+				if (offset >= p_position) {
 					return it;
 				}
 			} break;
@@ -454,6 +454,7 @@ void RichTextLabel::_shape_line(ItemFrame *p_frame, int p_line, const Ref<Font> 
 				ItemImage *img = (ItemImage *)it;
 				l.text_buf->add_object((uint64_t)it, img->image->get_size(), img->inline_align, 1);
 				text += String::chr(0xfffc);
+				l.char_count += 1;
 			} break;
 			case ITEM_TABLE: {
 				ItemTable *table = static_cast<ItemTable *>(it);
@@ -1574,53 +1575,36 @@ void RichTextLabel::_gui_input(Ref<InputEvent> p_event) {
 	Ref<InputEventKey> k = p_event;
 
 	if (k.is_valid()) {
-		if (k->is_pressed() && !k->get_alt() && !k->get_shift()) {
+		if (k->is_pressed()) {
 			bool handled = false;
-			switch (k->get_keycode()) {
-				case KEY_PAGEUP: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(vscroll->get_value() - vscroll->get_page());
-						handled = true;
-					}
-				} break;
-				case KEY_PAGEDOWN: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(vscroll->get_value() + vscroll->get_page());
-						handled = true;
-					}
-				} break;
-				case KEY_UP: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(vscroll->get_value() - get_theme_font("normal_font")->get_height(get_theme_font_size("normal_font_size")));
-						handled = true;
-					}
-				} break;
-				case KEY_DOWN: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(vscroll->get_value() + get_theme_font("normal_font")->get_height(get_theme_font_size("normal_font_size")));
-						handled = true;
-					}
-				} break;
-				case KEY_HOME: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(0);
-						handled = true;
-					}
-				} break;
-				case KEY_END: {
-					if (vscroll->is_visible_in_tree()) {
-						vscroll->set_value(vscroll->get_max());
-						handled = true;
-					}
-				} break;
-				case KEY_INSERT:
-				case KEY_C: {
-					if (k->get_command()) {
-						selection_copy();
-						handled = true;
-					}
 
-				} break;
+			if (k->is_action("ui_pageup") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(vscroll->get_value() - vscroll->get_page());
+				handled = true;
+			}
+			if (k->is_action("ui_pagedown") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(vscroll->get_value() + vscroll->get_page());
+				handled = true;
+			}
+			if (k->is_action("ui_up") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(vscroll->get_value() - get_theme_font("normal_font")->get_height(get_theme_font_size("normal_font_size")));
+				handled = true;
+			}
+			if (k->is_action("ui_down") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(vscroll->get_value() + get_theme_font("normal_font")->get_height(get_theme_font_size("normal_font_size")));
+				handled = true;
+			}
+			if (k->is_action("ui_home") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(0);
+				handled = true;
+			}
+			if (k->is_action("ui_end") && vscroll->is_visible_in_tree()) {
+				vscroll->set_value(vscroll->get_max());
+				handled = true;
+			}
+			if (k->is_action("ui_copy")) {
+				selection_copy();
+				handled = true;
 			}
 
 			if (handled) {
@@ -3523,7 +3507,7 @@ bool RichTextLabel::search(const String &p_string, bool p_from_selection, bool p
 	return false;
 }
 
-String RichTextLabel::_get_line_text(ItemFrame *p_frame, int p_line, Selection p_selection) {
+String RichTextLabel::_get_line_text(ItemFrame *p_frame, int p_line, Selection p_selection) const {
 	String text;
 	ERR_FAIL_COND_V(p_frame == nullptr, text);
 	ERR_FAIL_COND_V(p_line < 0 || p_line >= p_frame->lines.size(), text);
@@ -3590,7 +3574,7 @@ String RichTextLabel::_get_line_text(ItemFrame *p_frame, int p_line, Selection p
 	return text;
 }
 
-String RichTextLabel::get_selected_text() {
+String RichTextLabel::get_selected_text() const {
 	if (!selection.active || !selection.enabled) {
 		return "";
 	}
@@ -3612,6 +3596,22 @@ void RichTextLabel::selection_copy() {
 
 bool RichTextLabel::is_selection_enabled() const {
 	return selection.enabled;
+}
+
+int RichTextLabel::get_selection_from() const {
+	if (!selection.active || !selection.enabled) {
+		return -1;
+	}
+
+	return selection.from_frame->lines[selection.from_line].char_offset + selection.from_char;
+}
+
+int RichTextLabel::get_selection_to() const {
+	if (!selection.active || !selection.enabled) {
+		return -1;
+	}
+
+	return selection.to_frame->lines[selection.to_line].char_offset + selection.to_char - 1;
 }
 
 void RichTextLabel::set_bbcode(const String &p_bbcode) {
@@ -3649,6 +3649,8 @@ String RichTextLabel::get_text() {
 			text += t->text;
 		} else if (it->type == ITEM_NEWLINE) {
 			text += "\n";
+		} else if (it->type == ITEM_IMAGE) {
+			text += " ";
 		} else if (it->type == ITEM_INDENT || it->type == ITEM_LIST) {
 			text += "\t";
 		}
@@ -3840,6 +3842,11 @@ void RichTextLabel::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_selection_enabled", "enabled"), &RichTextLabel::set_selection_enabled);
 	ClassDB::bind_method(D_METHOD("is_selection_enabled"), &RichTextLabel::is_selection_enabled);
+
+	ClassDB::bind_method(D_METHOD("get_selection_from"), &RichTextLabel::get_selection_from);
+	ClassDB::bind_method(D_METHOD("get_selection_to"), &RichTextLabel::get_selection_to);
+
+	ClassDB::bind_method(D_METHOD("get_selected_text"), &RichTextLabel::get_selected_text);
 
 	ClassDB::bind_method(D_METHOD("parse_bbcode", "bbcode"), &RichTextLabel::parse_bbcode);
 	ClassDB::bind_method(D_METHOD("append_bbcode", "bbcode"), &RichTextLabel::append_bbcode);
