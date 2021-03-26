@@ -39,6 +39,7 @@
 #include "core/os/file_access.h"
 #include "core/os/os.h"
 #include "core/string/ucaps.h"
+#include "main/main.h"
 
 #include "../glue/cs_glue_version.gen.h"
 #include "../godotsharp_defs.h"
@@ -3035,9 +3036,9 @@ bool BindingsGenerator::_arg_default_value_from_variant(const Variant &p_val, Ar
 			}
 			break;
 		case Variant::FLOAT:
-#ifndef REAL_T_IS_DOUBLE
-			r_iarg.default_argument += "f";
-#endif
+			if (r_iarg.type.cname == name_cache.type_float) {
+				r_iarg.default_argument += "f";
+			}
 			break;
 		case Variant::STRING:
 		case Variant::STRING_NAME:
@@ -3050,23 +3051,32 @@ bool BindingsGenerator::_arg_default_value_from_variant(const Variant &p_val, Ar
 				r_iarg.default_argument = "\"" + r_iarg.default_argument + "\"";
 			}
 			break;
-		case Variant::TRANSFORM:
-			if (p_val.operator Transform() == Transform()) {
-				r_iarg.default_argument.clear();
-			}
-			r_iarg.default_argument = "new %s(" + r_iarg.default_argument + ")";
+		case Variant::PLANE: {
+			Plane plane = p_val.operator Plane();
+			r_iarg.default_argument = "new Plane(new Vector3(" + plane.normal.operator String() + "), " + rtos(plane.d) + ")";
 			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
-			break;
-		case Variant::PLANE:
-		case Variant::AABB:
+		} break;
+		case Variant::AABB: {
+			AABB aabb = p_val.operator ::AABB();
+			r_iarg.default_argument = "new AABB(new Vector3(" + aabb.position.operator String() + "), new Vector3(" + aabb.position.operator String() + "))";
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
+		case Variant::RECT2: {
+			Rect2 rect = p_val.operator Rect2();
+			r_iarg.default_argument = "new Rect2(new Vector2(" + rect.position.operator String() + "), new Vector2(" + rect.position.operator String() + "))";
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
+		case Variant::RECT2I: {
+			Rect2i rect = p_val.operator Rect2i();
+			r_iarg.default_argument = "new Rect2i(new Vector2i(" + rect.position.operator String() + "), new Vector2i(" + rect.position.operator String() + "))";
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
 		case Variant::COLOR:
-			r_iarg.default_argument = "new Color(1, 1, 1, 1)";
+			r_iarg.default_argument = "new %s(" + r_iarg.default_argument + ")";
 			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
 			break;
 		case Variant::VECTOR2:
 		case Variant::VECTOR2I:
-		case Variant::RECT2:
-		case Variant::RECT2I:
 		case Variant::VECTOR3:
 		case Variant::VECTOR3I:
 			r_iarg.default_argument = "new %s" + r_iarg.default_argument;
@@ -3104,12 +3114,43 @@ bool BindingsGenerator::_arg_default_value_from_variant(const Variant &p_val, Ar
 			r_iarg.default_argument = "new %s {}";
 			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_REF;
 			break;
-		case Variant::TRANSFORM2D:
-		case Variant::BASIS:
-		case Variant::QUAT:
-			r_iarg.default_argument = Variant::get_type_name(p_val.get_type()) + ".Identity";
+		case Variant::TRANSFORM2D: {
+			Transform2D transform = p_val.operator Transform2D();
+			if (transform == Transform2D()) {
+				r_iarg.default_argument = "Transform2D.Identity";
+			} else {
+				r_iarg.default_argument = "new Transform2D(new Vector2" + transform.elements[0].operator String() + ", new Vector2" + transform.elements[1].operator String() + ", new Vector2" + transform.elements[2].operator String() + ")";
+			}
 			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
-			break;
+		} break;
+		case Variant::TRANSFORM: {
+			Transform transform = p_val.operator Transform();
+			if (transform == Transform()) {
+				r_iarg.default_argument = "Transform.Identity";
+			} else {
+				Basis basis = transform.basis;
+				r_iarg.default_argument = "new Transform(new Vector3" + basis.get_column(0).operator String() + ", new Vector3" + basis.get_column(1).operator String() + ", new Vector3" + basis.get_column(2).operator String() + ", new Vector3" + transform.origin.operator String() + ")";
+			}
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
+		case Variant::BASIS: {
+			Basis basis = p_val.operator Basis();
+			if (basis == Basis()) {
+				r_iarg.default_argument = "Basis.Identity";
+			} else {
+				r_iarg.default_argument = "new Basis(new Vector3" + basis.get_column(0).operator String() + ", new Vector3" + basis.get_column(1).operator String() + ", new Vector3" + basis.get_column(2).operator String() + ")";
+			}
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
+		case Variant::QUAT: {
+			Quat quat = p_val.operator Quat();
+			if (quat == Quat()) {
+				r_iarg.default_argument = "Quat.Identity";
+			} else {
+				r_iarg.default_argument = "new Quat" + quat.operator String();
+			}
+			r_iarg.def_param_mode = ArgumentInterface::NULLABLE_VAL;
+		} break;
 		case Variant::CALLABLE:
 		case Variant::SIGNAL:
 			CRASH_NOW_MSG("Parameter of type '" + String(r_iarg.type.cname) + "' cannot have a default value.");
@@ -3590,17 +3631,52 @@ void BindingsGenerator::_initialize() {
 	initialized = true;
 }
 
+static String generate_all_glue_option = "--generate-mono-glue";
+static String generate_cs_glue_option = "--generate-mono-cs-glue";
+static String generate_cpp_glue_option = "--generate-mono-cpp-glue";
+
+static void handle_cmdline_options(String glue_dir_path, String cs_dir_path, String cpp_dir_path) {
+	BindingsGenerator bindings_generator;
+	bindings_generator.set_log_print_enabled(true);
+
+	if (!bindings_generator.is_initialized()) {
+		ERR_PRINT("Failed to initialize the bindings generator");
+		return;
+	}
+
+	if (glue_dir_path.length()) {
+		if (bindings_generator.generate_glue(glue_dir_path) != OK) {
+			ERR_PRINT(generate_all_glue_option + ": Failed to generate the C++ glue.");
+		}
+
+		if (bindings_generator.generate_cs_api(glue_dir_path.plus_file(API_SOLUTION_NAME)) != OK) {
+			ERR_PRINT(generate_all_glue_option + ": Failed to generate the C# API.");
+		}
+	}
+
+	if (cs_dir_path.length()) {
+		if (bindings_generator.generate_cs_api(cs_dir_path) != OK) {
+			ERR_PRINT(generate_cs_glue_option + ": Failed to generate the C# API.");
+		}
+	}
+
+	if (cpp_dir_path.length()) {
+		if (bindings_generator.generate_glue(cpp_dir_path) != OK) {
+			ERR_PRINT(generate_cpp_glue_option + ": Failed to generate the C++ glue.");
+		}
+	}
+}
+
 void BindingsGenerator::handle_cmdline_args(const List<String> &p_cmdline_args) {
 	const int NUM_OPTIONS = 2;
-	String generate_all_glue_option = "--generate-mono-glue";
-	String generate_cs_glue_option = "--generate-mono-cs-glue";
-	String generate_cpp_glue_option = "--generate-mono-cpp-glue";
 
 	String glue_dir_path;
 	String cs_dir_path;
 	String cpp_dir_path;
 
 	int options_left = NUM_OPTIONS;
+
+	bool exit_godot = false;
 
 	const List<String>::Element *elem = p_cmdline_args.front();
 
@@ -3613,6 +3689,7 @@ void BindingsGenerator::handle_cmdline_args(const List<String> &p_cmdline_args) 
 				elem = elem->next();
 			} else {
 				ERR_PRINT(generate_all_glue_option + ": No output directory specified (expected path to '{GODOT_ROOT}/modules/mono/glue').");
+				exit_godot = true;
 			}
 
 			--options_left;
@@ -3624,6 +3701,7 @@ void BindingsGenerator::handle_cmdline_args(const List<String> &p_cmdline_args) 
 				elem = elem->next();
 			} else {
 				ERR_PRINT(generate_cs_glue_option + ": No output directory specified.");
+				exit_godot = true;
 			}
 
 			--options_left;
@@ -3635,6 +3713,7 @@ void BindingsGenerator::handle_cmdline_args(const List<String> &p_cmdline_args) 
 				elem = elem->next();
 			} else {
 				ERR_PRINT(generate_cpp_glue_option + ": No output directory specified.");
+				exit_godot = true;
 			}
 
 			--options_left;
@@ -3644,37 +3723,13 @@ void BindingsGenerator::handle_cmdline_args(const List<String> &p_cmdline_args) 
 	}
 
 	if (glue_dir_path.length() || cs_dir_path.length() || cpp_dir_path.length()) {
-		BindingsGenerator bindings_generator;
-		bindings_generator.set_log_print_enabled(true);
+		handle_cmdline_options(glue_dir_path, cs_dir_path, cpp_dir_path);
+		exit_godot = true;
+	}
 
-		if (!bindings_generator.initialized) {
-			ERR_PRINT("Failed to initialize the bindings generator");
-			::exit(0);
-		}
-
-		if (glue_dir_path.length()) {
-			if (bindings_generator.generate_glue(glue_dir_path) != OK) {
-				ERR_PRINT(generate_all_glue_option + ": Failed to generate the C++ glue.");
-			}
-
-			if (bindings_generator.generate_cs_api(glue_dir_path.plus_file(API_SOLUTION_NAME)) != OK) {
-				ERR_PRINT(generate_all_glue_option + ": Failed to generate the C# API.");
-			}
-		}
-
-		if (cs_dir_path.length()) {
-			if (bindings_generator.generate_cs_api(cs_dir_path) != OK) {
-				ERR_PRINT(generate_cs_glue_option + ": Failed to generate the C# API.");
-			}
-		}
-
-		if (cpp_dir_path.length()) {
-			if (bindings_generator.generate_glue(cpp_dir_path) != OK) {
-				ERR_PRINT(generate_cpp_glue_option + ": Failed to generate the C++ glue.");
-			}
-		}
-
+	if (exit_godot) {
 		// Exit once done
+		Main::cleanup(true);
 		::exit(0);
 	}
 }
